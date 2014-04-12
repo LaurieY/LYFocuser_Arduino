@@ -1,5 +1,6 @@
 
 
+
 /* 
  * Source for an Arduino+Adafruit motorshield based 
  * focus controller.
@@ -35,6 +36,9 @@ Used to set the position positive when switched on, needed since I don't save th
 
 
 June 2012, reverse Fwd & Back settings 
+alter the sensitivity.  Now all moves are in microsteps 
+alter the sensitivity.  Now all moves are in microsteps 
+alter the sensitivity.  Now all moves are in microsteps 
 alter the sensitivity.  Now all moves are in microsteps 
 with default microstepping of 8 there are now 1600 steps per rev
 
@@ -100,10 +104,10 @@ int buttonSpeedupValue = 3;
 
 
 
-#define VER "V Open_Focuser_1.01 June 2012"
+#define VER "LY Open_Focuser_1.02 Apr 2014"
 #define LY_MIC 1 // microsteps are 8 
 //#define LY_MIC_MOVE 2 // Not used
-#define LY_STEPS_REV 5000
+#define LY_STEPS_REV 200  //steps per rev
 #define LY_STEPS_SLOW_REV LY_STEPS_REV/1
 #define RPM 2
 
@@ -111,12 +115,12 @@ LY_Stepper motor(LY_STEPS_REV);
 
 
 void setup()
-{
+{delay(1000);
 	unsigned int temp;
 	// start serial port at 9600 bps:
 	Serial.begin(9600);
-	//delay(1000);
-	//Serial.println(VER);
+	delay(500);
+//	Serial.println(VER);
 motor.enable();
 motor.setMicroSteps(LY_MIC);
 	motor.setSpeed(RPM);
@@ -136,8 +140,8 @@ temp = eeprom_read_word(&init_e_a);
                  {position=temp;}  */
 		target_position = position; // no movement right out of the gates
 		ee_position = position;
-		Serial.print("Position read: ");
-		Serial.println(position);
+//		Serial.print("Position read: ");
+//		Serial.println(position);
 	}
 /****/
 
@@ -150,7 +154,13 @@ temp = eeprom_read_word(&init_e_a);
 }
 
 void loop()
-{
+{	 if ((millis() - moveTime)/1000 >10) {
+	if (ee_position != position ) {write_status();
+				//Serial.print("updated eeprom to in loop");
+				//Serial.println(position);
+		ee_position = position;
+	}}// only write to EEPROM if position has changed and at after 10 secs
+	
 	// if we get a valid byte, read analog ins:
 	if (Serial.available() > 0) {
 		// get incoming byte:
@@ -167,7 +177,8 @@ void loop()
 			// go again
 			index = 0;
 		}
-	} else  {
+
+} else  {
   // ********************nothing incoming from serial so check buttons
   //****************  BUTTONS  ***********************
   
@@ -368,12 +379,16 @@ else {
 		if ((millis() - moveTime)/1000 >energiseTime) {
   		motor.release(); //release if no action for 3 secs 
                 }
-                if ((millis() - moveTime)/1000 >10) {
+ /*               if ((millis() - moveTime)/1000 >10) {
 		if (ee_position != position ) {write_status(); 
+	//		Serial.print("updated eeprom to ");
+					
+	//				Serial.println(position);
 		ee_position = position;
 		}// only write to EEPROM if position has changed and at after 10 secs
 
-	} }
+	}*/
+  }
 }
 
 
