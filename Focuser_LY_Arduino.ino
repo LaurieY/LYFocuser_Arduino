@@ -99,7 +99,8 @@ long	target_position = 0;
 int stop = 0;
 int currentButtonMoveValue = BUTTONMOVEVALUE;
 int defaultButtonMoveValue = BUTTONMOVEVALUE;
-
+int defaultButtonMoveSpeed = 20; // RPM for button fast moves
+int currentMoveSpeed =2;
 int buttonSpeedupValue = 3;
 
 
@@ -108,7 +109,7 @@ int buttonSpeedupValue = 3;
 #define LY_MIC 1 // microsteps are 8 
 //#define LY_MIC_MOVE 2 // Not used
 #define LY_STEPS_REV 200  //steps per rev
-#define LY_STEPS_SLOW_REV LY_STEPS_REV/1
+#define LY_STEPS_SLOW_REV LY_STEPS_REV/10 // keep slow for only 20 steps
 #define RPM 2
 
 LY_Stepper motor(LY_STEPS_REV);
@@ -124,6 +125,7 @@ void setup()
 motor.enable();
 motor.setMicroSteps(LY_MIC);
 	motor.setSpeed(RPM);
+	currentMoveSpeed =RPM;
 	//motor.release();
   position=4000;
 
@@ -156,8 +158,8 @@ temp = eeprom_read_word(&init_e_a);
 void loop()
 {	 if ((millis() - moveTime)/1000 >10) {
 	if (ee_position != position ) {write_status();
-				//Serial.print("updated eeprom to in loop");
-				//Serial.println(position);
+				Serial.print("updated eeprom to in loop");
+				Serial.println(position);
 		ee_position = position;
 	}}// only write to EEPROM if position has changed and at after 10 secs
 	
@@ -194,7 +196,9 @@ void loop()
        
       
       // p(" button already pressed and elapsed time is %d - %d",millis(),buttonTime);
-         if (((millis()-buttonTime)/1000)>2) {currentButtonMoveValue = defaultButtonMoveValue*20;  }
+         if (((millis()-buttonTime)/1000)>2) {currentButtonMoveValue = defaultButtonMoveValue*30; // 30 step moves ensures all fast button moves would be fast
+									currentMoveSpeed = defaultButtonMoveSpeed; //move at 20 times normal speed
+									 motor.setSpeed(currentMoveSpeed); }
          }
         if (current_black ==0) { //black button move  increase position by BUTTONMOVEVALUE
                 target_position = position+currentButtonMoveValue;
@@ -209,7 +213,8 @@ void loop()
               }
   delay(100);
   //buttonTime=millis();
-        }else {buttonPressed = false;}
+        }else {buttonPressed = false;
+		if (currentMoveSpeed !=RPM) motor.setSpeed(RPM); // reset speed to normal if had been changed}
         }
         
  //*************   END OF BUTTONS  *******************
@@ -218,7 +223,7 @@ void loop()
 	// nothing to read, see if the focuser needs to be moved
 	move_focuser();
 }
-
+}
 void process_cmd(char* cmd) {
 	if (strcmp(cmd, "p") == 0) {
 		// get position
@@ -242,7 +247,7 @@ void process_cmd(char* cmd) {
                  motor.swapDirection(atoi(u1));
 
 	}else if (strncmp(cmd, "b ", 2) == 0) {
-	        // then button move speed, then maybe if reqd button move delay in secs before speedup
+	        // then button move RPM, 
 		 char* u2;   
                 u2= strtok(cmd+2," ,:");
 		p("B %s ",u2);
@@ -340,7 +345,7 @@ if (target_position != position) {
 motor.unrelease(); // allows motor to be energized for 3 secs after the move (for extra stability without heating
 target_difference = target_position - position;
 int delay_mult =1;
-if (abs(target_difference) <= LY_STEPS_SLOW_REV)  delay_mult =8;
+if (abs(target_difference) <= LY_STEPS_SLOW_REV)  delay_mult =8;// button move fast is  30 steps so would be fast!!!
  /* Serial.print("Position ");
 Serial.println(position);
   Serial.print("Target Position ");
