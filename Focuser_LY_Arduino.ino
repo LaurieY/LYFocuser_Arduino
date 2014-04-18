@@ -214,7 +214,8 @@ void loop()
   delay(100);
   //buttonTime=millis();
         }else {buttonPressed = false;
-		if (currentMoveSpeed !=RPM) motor.setSpeed(RPM); // reset speed to normal if had been changed}
+		if (currentMoveSpeed !=RPM) motor.setSpeed(RPM); // reset speed to normal if had been changed
+		}
         }
         
  //*************   END OF BUTTONS  *******************
@@ -223,7 +224,7 @@ void loop()
 	// nothing to read, see if the focuser needs to be moved
 	move_focuser();
 }
-}
+
 void process_cmd(char* cmd) {
 	if (strcmp(cmd, "p") == 0) {
 		// get position
