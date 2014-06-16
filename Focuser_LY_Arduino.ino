@@ -14,6 +14,17 @@
   * $Source: "\electronics\Arduino\Projects\focuser\LaurieY-OpenFocuser\open_focuser_LY\open_focuser_LY.pde" $
  * $Revision: 1.3 $
  * $Date: 2011/03/15 21:22:49 $
+ 
+ **  June 15 2014
+ Included commands c rpm  sets rpm and
+ and 
+ d delay_mult for fast moves ( can be used to slow down the fast moves ) 1 is fast 8 is the same as the slowdown speeds)
+ Both are saved in eeprom
+ 
+ ** also fixed a few bits where comparisons were between int and unsigned ints
+ 
+ Fixed the step pulse width and delay between pulses where the slow (long delay) pulses were not really slow because of overflow in the delayto microseconds call
+ Changed it to delay  (in milliseconds) not as accurate but not important
  *  Changed move_focuser to be quicker by stepping by unints of 800
 2011-April-15
 Changed to receive and transmit across serial interface steps in 1/200th  so for a MICROSTEP of 8 need to mult the requested difference  by 8 
@@ -76,7 +87,10 @@ void p(char *fmt, ... ){
 
 
 uint16_t position_e_a __attribute__((section(".eeprom"))) = 0;
+uint16_t rpm_e_a __attribute__((section(".eeprom"))) = 4;
 uint16_t init_e_a __attribute__((section(".eeprom"))) = 2;
+uint16_t fast_delay_mult_e_a __attribute__((section(".eeprom"))) = 6;
+
 #define INIT_EEPROM_VALUE  0xFFFF // 0x3287
 
 #define MAXLEN 50
@@ -92,16 +106,18 @@ long ee_position = position;  // the last value to be written to EEPROM
 int current_black,current_red =1;
 long	target_position = 0;
  long target_difference =0;
- long moveTime, buttonTime;
- int energiseTime = 3;
+ unsigned long moveTime, buttonTime;
+ unsigned long energiseTime = 3;
  boolean buttonPressed=false;
  unsigned int stepsize=1;
 int stop = 0;
 int currentButtonMoveValue = BUTTONMOVEVALUE;
 int defaultButtonMoveValue = BUTTONMOVEVALUE;
-int defaultButtonMoveSpeed = 20; // RPM for button fast moves
+int defaultButtonMoveSpeed = 120; // RPM for button fast moves
 int currentMoveSpeed =2;
 int buttonSpeedupValue = 3;
+int fast_delay_mult =1;
+
 
 
 
@@ -110,8 +126,8 @@ int buttonSpeedupValue = 3;
 //#define LY_MIC_MOVE 2 // Not used
 #define LY_STEPS_REV 200  //steps per rev
 #define LY_STEPS_SLOW_REV LY_STEPS_REV/10 // keep slow for only 20 steps
-#define RPM 2
-
+#define RPM 20
+int rpm = RPM;
 LY_Stepper motor(LY_STEPS_REV);
 
 
@@ -119,16 +135,15 @@ void setup()
 {delay(1000);
 	unsigned int temp;
 	// start serial port at 9600 bps:
-	Serial.begin(9600);
+	Serial.begin(115200);
 	delay(500);
 //	Serial.println(VER);
 motor.enable();
 motor.setMicroSteps(LY_MIC);
-	motor.setSpeed(RPM);
-	currentMoveSpeed =RPM;
+
 	//motor.release();
   position=4000;
-
+rpm = RPM;
 temp = eeprom_read_word(&init_e_a);
 	if (temp != INIT_EEPROM_VALUE) {
 		eeprom_write_word(&init_e_a, INIT_EEPROM_VALUE);
@@ -142,24 +157,28 @@ temp = eeprom_read_word(&init_e_a);
                  {position=temp;}  */
 		target_position = position; // no movement right out of the gates
 		ee_position = position;
+		rpm = eeprom_read_word(&rpm_e_a);
+		fast_delay_mult= eeprom_read_word(&fast_delay_mult_e_a);
 //		Serial.print("Position read: ");
 //		Serial.println(position);
 	}
 /****/
 
+motor.setSpeed(rpm);
+currentMoveSpeed =rpm;
   target_position = position; // no movement right out of the gates
     pinMode(BLACKBUTTON, INPUT);
     pinMode(REDBUTTON, INPUT);
     digitalWrite(BLACKBUTTON, HIGH); //turn on 20k pullup resistors to simplify switch input
     digitalWrite(REDBUTTON, HIGH);
 	Serial.println("Ready");
+	//p("PPP READSY");
 }
 
 void loop()
 {	 if ((millis() - moveTime)/1000 >10) {
 	if (ee_position != position ) {write_status();
-				Serial.print("updated eeprom to in loop");
-				Serial.println(position);
+				//p("updated eeprom to in loop %d",position);
 		ee_position = position;
 	}}// only write to EEPROM if position has changed and at after 10 secs
 	
@@ -185,20 +204,24 @@ void loop()
   //****************  BUTTONS  ***********************
   
         current_black = digitalRead(BLACKBUTTON);
+		
         current_red = digitalRead(REDBUTTON);
+		//p("Current RED= %d ",current_red);
         if (current_black!=current_red) {  //one button is pressed, they are not equal
        if (!buttonPressed)  { buttonTime=millis(); //mark 1st time button press is seen
        buttonPressed=true;
         currentButtonMoveValue = defaultButtonMoveValue;
-    //  p("button 1st pressed at %d",buttonTime);
+     //p("button 1st pressed at %d",buttonTime);
        }
        else {//button was already pressed so look at how long & increase speed if >3 secs
        
       
-      // p(" button already pressed and elapsed time is %d - %d",millis(),buttonTime);
-         if (((millis()-buttonTime)/1000)>2) {currentButtonMoveValue = defaultButtonMoveValue*30; // 30 step moves ensures all fast button moves would be fast
-									currentMoveSpeed = defaultButtonMoveSpeed; //move at 20 times normal speed
-									 motor.setSpeed(currentMoveSpeed); }
+      //p(" button already pressed and elapsed time is %d - %d",millis(),buttonTime);
+         if (((millis()-buttonTime)/1000)>2) {currentButtonMoveValue = defaultButtonMoveValue*100; // 30 step moves ensures all fast button moves would be fast
+									currentMoveSpeed = defaultButtonMoveSpeed; //move at 120 RPM
+									 //p("Upping motorspeed to %d",currentMoveSpeed); 
+									 //p("currentMoveValue= %d",currentButtonMoveValue);
+									motor.setSpeed(currentMoveSpeed); }
          }
         if (current_black ==0) { //black button move  increase position by BUTTONMOVEVALUE
                 target_position = position+currentButtonMoveValue;
@@ -208,7 +231,8 @@ void loop()
     stop=0;
               }
               while (  target_position != position) {
-                move_focuser();
+              move_focuser(currentButtonMoveValue);
+
                 delay(10);
               }
   delay(100);
@@ -222,7 +246,7 @@ void loop()
 	// read temperature
 	// adjust focuser if needed based on temp
 	// nothing to read, see if the focuser needs to be moved
-	move_focuser();
+	move_focuser(1);
 }
 
 void process_cmd(char* cmd) {
@@ -231,12 +255,15 @@ void process_cmd(char* cmd) {
 		Serial.print("P ");
 
 		Serial.println(position,DEC);
-	} else if (strncmp(cmd, "m ", 2) == 0) {
+	} else if (strncmp(cmd, "m", 1) == 0) {
 		// move
+		//p(" In MOVE");
+		
 		 long temp = atol(cmd+2);
 		Serial.print("M ");
 		Serial.println(temp);
 		target_position = temp;
+		//	p("start time in msec %u",millis());
           stop=0; //LEY
 	} else if (strncmp(cmd, "w ", 2) == 0) {
 		// ** swap direction **
@@ -285,7 +312,7 @@ else if (strcmp(cmd, "i") == 0) {
 		Serial.print("A ");
 		Serial.println(target_position);
 	} else if (strcmp(cmd, "h") == 0) {
-		// halt (ASCOM style)
+		// halt (ASCOM style)i
 		Serial.println("H");
 		target_position = position;
 	} else if (strcmp(cmd, "r") == 0) {
@@ -314,7 +341,27 @@ else if (strcmp(cmd, "i") == 0) {
 		target_position = setPos;
 		position = setPos;
 		//write_status();
-	}else if (strncmp(cmd, "e ", 2) == 0){ 
+	}else if (strncmp(cmd, "c ", 2) == 0){   		// sets rpm as value
+		
+		Serial.print("B ");
+		rpm  = atoi(cmd+2);
+
+		Serial.println(rpm);
+		eeprom_write_word(&rpm_e_a, rpm);
+	p("set rpm  to %i", eeprom_read_word(&rpm_e_a));
+		//write_status();
+	}
+	else if (strncmp(cmd, "d ", 2) == 0){ 		// sets fast delay_mult.  Can set to 8 to make all moves slower as value
+		
+		Serial.print("D ");
+		fast_delay_mult  = atoi(cmd+2);
+		eeprom_write_word(&fast_delay_mult_e_a, fast_delay_mult);
+		p("set fast_delay_mult to %i", eeprom_read_word(&fast_delay_mult_e_a));
+		
+		
+		//write_status();
+	}
+	else if (strncmp(cmd, "e ", 2) == 0){ 
 		// set time to remain energized in seconds (defalt stays at 3
 
 		Serial.print("E ");
@@ -330,7 +377,7 @@ else if (strcmp(cmd, "i") == 0) {
 	}
 }
 
-void move_focuser() {
+void move_focuser(int moveSteps) {
 	if (stop == 1) {
 		motor.release();
 		return;
@@ -339,14 +386,21 @@ if (stop ==2) {
   motor.release();
   return;
 }
-stepsize=1;
+//moveSteps=1;
+
+stepsize=moveSteps;
 // Make moves in microsteps units
 // if move difference < 1/4 turn then do it slowly at 1/10 the normal RPM rate do this by adding delays between each step
 if (target_position != position) {
+
 motor.unrelease(); // allows motor to be energized for 3 secs after the move (for extra stability without heating
 target_difference = target_position - position;
-int delay_mult =1;
-if (abs(target_difference) <= LY_STEPS_SLOW_REV)  delay_mult =8;// button move fast is  30 steps so would be fast!!!
+int delay_mult =fast_delay_mult;
+if (abs(target_difference) <= LY_STEPS_SLOW_REV)  delay_mult =8;// button move fast is  100 steps so would be fast!!!
+
+//p("Position %d",position);
+//p("Target Position %d",target_position);
+
  /* Serial.print("Position ");
 Serial.println(position);
   Serial.print("Target Position ");
@@ -369,21 +423,26 @@ Serial.println(stepsize);
     
 		position = position+(stepsize);
 		motor.step(stepsize, FORWARD, delay_mult);
-//Serial.print("step fwd = : "); Serial.println(position);
+// p("step OUT to : %d",position);
+//p("step delaymult : %d",delay_mult);
 		//write_status();
 	} else if (target_difference<0) {
 
 		position = position-(stepsize);
 		motor.step(stepsize, BACKWARD, delay_mult);
-
+ //p("step IN  = : %",position);
 		//write_status(); 
 }
 moveTime = millis();  // record the last time a move was made so that after a period the motor can be released
+
 //write_status(); //only write position to EEprom at end of move
 	}
-else {
-		if ((millis() - moveTime)/1000 >energiseTime) {
-  		motor.release(); //release if no action for 3 secs 
+else {//release if no action for 3 secs
+		if ((millis() - moveTime)/1000 >=energiseTime) {
+			// p("end time () in msec %u",millis());
+  		motor.release(); 
+	                } else {
+	               
                 }
  /*               if ((millis() - moveTime)/1000 >10) {
 		if (ee_position != position ) {write_status(); 
@@ -403,8 +462,7 @@ void write_status() {
 
 	 
 eeprom_write_word(&position_e_a, position);
-//Serial.print(" writing to EEPROM: ");
-//Serial.println(position);
+//p(" writing to EEPROM: %p ",position);
 }
 
 
