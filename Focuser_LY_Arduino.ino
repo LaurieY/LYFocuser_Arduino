@@ -118,6 +118,8 @@ int currentMoveSpeed =2;
 int buttonSpeedupValue = 3;
 int fast_delay_mult =1;
 
+int temp1;
+
 
 
 
@@ -157,10 +159,18 @@ temp = eeprom_read_word(&init_e_a);
                  {position=temp;}  */
 		target_position = position; // no movement right out of the gates
 		ee_position = position;
-		rpm = eeprom_read_word(&rpm_e_a);
-		fast_delay_mult= eeprom_read_word(&fast_delay_mult_e_a);
-//		Serial.print("Position read: ");
-//		Serial.println(position);
+			while (!eeprom_is_ready());
+		  cli();
+		rpm = eeprom_read_word((uint16_t*)rpm_e_a);
+			sei();
+			while (!eeprom_is_ready());
+		  cli();
+		fast_delay_mult= eeprom_read_word((uint16_t*)fast_delay_mult_e_a);
+		sei();
+// report eeprom values while initialising 
+ p("Starting position = %i", position);
+  p("Starting rpm = %i", rpm);
+   p("Starting fast_delay_mult = %i", fast_delay_mult);
 	}
 /****/
 
@@ -238,7 +248,7 @@ void loop()
   delay(100);
   //buttonTime=millis();
         }else {buttonPressed = false;
-		if (currentMoveSpeed !=RPM) motor.setSpeed(RPM); // reset speed to normal if had been changed
+		if (currentMoveSpeed !=rpm) motor.setSpeed(rpm); // reset speed to normal if had been changed
 		}
         }
         
@@ -343,20 +353,37 @@ else if (strcmp(cmd, "i") == 0) {
 		//write_status();
 	}else if (strncmp(cmd, "c ", 2) == 0){   		// sets rpm as value
 		
-		Serial.print("B ");
+		Serial.print("C ");
 		rpm  = atoi(cmd+2);
 
 		Serial.println(rpm);
-		eeprom_write_word(&rpm_e_a, rpm);
-	p("set rpm  to %i", eeprom_read_word(&rpm_e_a));
+		 while (!eeprom_is_ready());
+		  cli();
+			if(eeprom_read_word((uint16_t*)rpm_e_a) != rpm) {
+			eeprom_write_word((uint16_t*)rpm_e_a, rpm);
+			}
+			sei();
+//		eeprom_write_word(&rpm_e_a, (long)rpm);
+	p("set rpm  to %i", rpm);
+	motor.setSpeed(rpm);
 		//write_status();
 	}
-	else if (strncmp(cmd, "d ", 2) == 0){ 		// sets fast delay_mult.  Can set to 8 to make all moves slower as value
+	else if (strncmp(cmd, "d ", 2) == 0){ 		
+	// sets fast delay_mult.  Can set to 8 to make all moves slower as value, slow moves always use 8, the fast did default to 1
 		
 		Serial.print("D ");
 		fast_delay_mult  = atoi(cmd+2);
-		eeprom_write_word(&fast_delay_mult_e_a, fast_delay_mult);
-		p("set fast_delay_mult to %i", eeprom_read_word(&fast_delay_mult_e_a));
+			Serial.println(fast_delay_mult);
+			while (!eeprom_is_ready());
+		  cli();
+		  temp1= eeprom_read_word((uint16_t*)fast_delay_mult_e_a);
+			if(temp1 != fast_delay_mult) {
+			eeprom_write_word((uint16_t*)fast_delay_mult_e_a, fast_delay_mult);
+			}
+			sei();
+	//	eeprom_write_word(&fast_delay_mult_e_a, (long)fast_delay_mult);
+	//p("temp value from eeprom read %i", temp1);
+		p("set fast_delay_mult to %i", fast_delay_mult);
 		
 		
 		//write_status();
@@ -459,10 +486,11 @@ else {//release if no action for 3 secs
 
 
 void write_status() {
-
+cli();
 	 
 eeprom_write_word(&position_e_a, position);
 //p(" writing to EEPROM: %p ",position);
+sei();
 }
 
 
