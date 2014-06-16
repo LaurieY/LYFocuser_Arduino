@@ -421,6 +421,7 @@ stepsize=moveSteps;
 if (target_position != position) {
 
 motor.unrelease(); // allows motor to be energized for 3 secs after the move (for extra stability without heating
+// built-in 1mSec delay in unrelease
 target_difference = target_position - position;
 int delay_mult =fast_delay_mult;
 if (abs(target_difference) <= LY_STEPS_SLOW_REV)  delay_mult =8;// button move fast is  100 steps so would be fast!!!
