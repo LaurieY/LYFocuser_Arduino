@@ -15,16 +15,7 @@
  * $Revision: 1.3 $
  * $Date: 2011/03/15 21:22:49 $
  
- **  June 15 2014
- Included commands c rpm  sets rpm and
- and 
- d delay_mult for fast moves ( can be used to slow down the fast moves ) 1 is fast 8 is the same as the slowdown speeds)
- Both are saved in eeprom
  
- ** also fixed a few bits where comparisons were between int and unsigned ints
- 
- Fixed the step pulse width and delay between pulses where the slow (long delay) pulses were not really slow because of overflow in the delayto microseconds call
- Changed it to delay  (in milliseconds) not as accurate but not important
  *  Changed move_focuser to be quicker by stepping by unints of 800
 2011-April-15
 Changed to receive and transmit across serial interface steps in 1/200th  so for a MICROSTEP of 8 need to mult the requested difference  by 8 
@@ -67,7 +58,18 @@ This gives me about 5mm per full rev of 200 steps so about 25 microns per step
 So for autofocus I should use 2 -> 4 steps per exposure with a focus zone of about 100 microns
 
 Aug 2012 
-Added a command 'e' to set the time to retain energise, so I can trial the potential to keep motor energinsed
+Added a command 'e' to set the time to retain energise, so I can trial the potential to keep motor energised
+
+**  June 15 2014
+ Included commands c rpm  sets rpm and
+ and 
+ d delay_mult for fast moves ( can be used to slow down the fast moves ) 1 is fast 8 is the same as the slowdown speeds)
+ Both are saved in eeprom
+ 
+ ** also fixed a few bits where comparisons were between int and unsigned ints
+ 
+ Fixed the step pulse width and delay between pulses where the slow (long delay) pulses were not really slow because of overflow in the delayto microseconds call
+ Changed it to delay  (in milliseconds) not as accurate but not important
 **/
 
 #include <LYMotor.h>
@@ -143,7 +145,7 @@ void setup()
 motor.enable();
 motor.setMicroSteps(LY_MIC);
 
-	//motor.release();
+	motor.release();
   position=4000;
 rpm = RPM;
 temp = eeprom_read_word(&init_e_a);
@@ -176,7 +178,7 @@ temp = eeprom_read_word(&init_e_a);
 
 motor.setSpeed(rpm);
 currentMoveSpeed =rpm;
-  target_position = position; // no movement right out of the gates
+  target_position = position; // no movement right out of the gate
     pinMode(BLACKBUTTON, INPUT);
     pinMode(REDBUTTON, INPUT);
     digitalWrite(BLACKBUTTON, HIGH); //turn on 20k pullup resistors to simplify switch input

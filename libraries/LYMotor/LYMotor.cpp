@@ -135,12 +135,13 @@ void LY_Stepper::setSpeed(uint16_t rpm) {
 
 //delay(3000);
   steppingcounter = 0;  // an absolute counter of position
-  digitalWrite(MOTORNOTENABLE,LOW);
+ //  digitalWrite(MOTORNOTENABLE,LOW); // ?June 2014 Why enable NOW?
 }
 
 void LY_Stepper::release(void) {
  digitalWrite(MOTORNOTENABLE, HIGH);
-  digitalWrite(MOTORNOTSLEEP, LOW);
+  //digitalWrite(MOTORNOTSLEEP, LOW);
+  digitalWrite(MOTORNOTSLEEP, HIGH); // just use the enable pin
    delay(2);
 }
 void LY_Stepper::unrelease(void) {
