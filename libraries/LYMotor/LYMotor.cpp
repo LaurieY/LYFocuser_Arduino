@@ -56,7 +56,7 @@ void LY_Stepper::init(uint16_t steps) {
  // currentstep = 0;
 	
 pinMode(MOTORNOTENABLE,OUTPUT);
-
+   digitalWrite(MOTORNOTENABLE, HIGH); 
 
 	pinMode(MOTORSTEP,OUTPUT);
 	digitalWrite(MOTORSTEP,LOW);
@@ -74,7 +74,7 @@ pinMode(MOTORDIR,OUTPUT);
    digitalWrite(MOTORMS2, LOW);
    pinMode(MOTORMS3,OUTPUT);
    digitalWrite(MOTORMS3, LOW);  
-   digitalWrite(MOTORNOTENABLE, LOW);  
+ 
    
  //usteps= 8;
  // currentstep = 0;
